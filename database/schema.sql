@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS mahkeme_kararlari (
     karar_ozeti TEXT,
     hukuk_alani VARCHAR(100),
     anahtar_kelimeler TEXT[],
-    embedding_vector VECTOR(1536), -- OpenAI embedding boyutu
+    embedding_vector TEXT, -- OpenAI embedding boyutu (JSON string olarak saklanacak)
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
 );
