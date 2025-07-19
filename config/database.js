@@ -20,13 +20,11 @@ async function initializeDatabase() {
     // Conversations tablosunu oluştur
     await pool.query(`
       CREATE TABLE IF NOT EXISTS conversations (
-        id SERIAL PRIMARY KEY,
-        user_id VARCHAR(100) NOT NULL,
-        title VARCHAR(255) NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        message_count INTEGER DEFAULT 0,
-        is_active BOOLEAN DEFAULT true
+        id VARCHAR(100) PRIMARY KEY,
+        user_id VARCHAR(50) NOT NULL,
+        title VARCHAR(200),
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
 
@@ -34,10 +32,10 @@ async function initializeDatabase() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS messages (
         id SERIAL PRIMARY KEY,
-        conversation_id INTEGER REFERENCES conversations(id) ON DELETE CASCADE,
+        conversation_id VARCHAR(100) REFERENCES conversations(id) ON DELETE CASCADE,
         role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant')),
         content TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
         message_order INTEGER NOT NULL
       )
     `);
@@ -58,29 +56,25 @@ async function initializeDatabase() {
 
     // Trigger fonksiyonu oluştur
     await pool.query(`
-      CREATE OR REPLACE FUNCTION update_conversation_message_count()
+      CREATE OR REPLACE FUNCTION update_conversation_updated_at()
       RETURNS TRIGGER AS $$
       BEGIN
-        IF TG_OP = 'INSERT' THEN
-          UPDATE conversations 
-          SET message_count = message_count + 1,
-              updated_at = CURRENT_TIMESTAMP
-          WHERE id = NEW.conversation_id;
-          RETURN NEW;
-        ELSIF TG_OP = 'DELETE' THEN
-          UPDATE conversations 
-          SET message_count = message_count - 1,
-              updated_at = CURRENT_TIMESTAMP
-          WHERE id = OLD.conversation_id;
-          RETURN OLD;
-        END IF;
-        RETURN NULL;
+        UPDATE conversations 
+        SET updated_at = NOW()
+        WHERE id = NEW.conversation_id;
+        RETURN NEW;
       END;
       $$ LANGUAGE plpgsql;
     `);
 
-    // Trigger zaten mevcut olduğu için oluşturmuyoruz
-    console.log('✅ Trigger zaten mevcut, atlanıyor');
+    // Trigger oluştur
+    await pool.query(`
+      DROP TRIGGER IF EXISTS update_conversation_updated_at_trigger ON messages;
+      CREATE TRIGGER update_conversation_updated_at_trigger
+      AFTER INSERT ON messages
+      FOR EACH ROW
+      EXECUTE FUNCTION update_conversation_updated_at();
+    `);
 
     console.log('✅ Conversations ve messages tabloları oluşturuldu');
 
