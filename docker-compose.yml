@@ -31,7 +31,7 @@ services:
       DB_NAME: hukukkem
       DB_USER: postgres
       DB_PASSWORD: ${DB_PASSWORD:-hukukkem123}
-      CORS_ORIGIN: ${CORS_ORIGIN:-https://hukukkemal.com,https://www.hukukkemal.com}
+      CORS_ORIGIN: ${CORS_ORIGIN:-https://hukukkemai.com,https://www.hukukkemai.com}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
     depends_on:
       - postgres
