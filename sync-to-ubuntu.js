@@ -4,7 +4,7 @@ const axios = require('axios');
 // Windows Docker PostgreSQL bağlantısı
 const windowsPool = new Pool({
   host: 'localhost',
-  port: 5432,
+  port: 5433,
   database: 'hukuk',
   user: 'hukuk_user',
   password: 'hukuk_pass'
@@ -25,30 +25,27 @@ async function syncToUbuntu() {
     const conversationsResult = await windowsPool.query(`
       SELECT id, user_id, title, created_at, updated_at, is_active
       FROM conversations 
-      WHERE created_at >= $1
       ORDER BY created_at DESC
-    `, [yesterday]);
+      LIMIT 10
+    `);
     
     // Yeni messages
     const messagesResult = await windowsPool.query(`
       SELECT id, conversation_id, role, content, created_at
       FROM messages 
-      WHERE created_at >= $1
       ORDER BY created_at DESC
-    `, [yesterday]);
+      LIMIT 20
+    `);
     
-    // Yeni kararlar (son 7 gün)
-    const weekAgo = new Date();
-    weekAgo.setDate(weekAgo.getDate() - 7);
-    
+    // Yeni kararlar (son 10 kayıt)
     const kararlarResult = await windowsPool.query(`
       SELECT id, karar_tarihi, basvuru_no, rg_tarih_sayi, mahkeme, 
              üyeler, raportor, basvurucu, karar_ozeti, degerlendirme, 
              giderim, hüküm, baslik, url
       FROM kararlar 
-      WHERE created_at >= $1
       ORDER BY karar_tarihi DESC
-    `, [weekAgo]);
+      LIMIT 10
+    `);
     
     const syncData = {
       conversations: conversationsResult.rows,
