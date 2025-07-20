@@ -41,7 +41,7 @@ async function initializeDatabase() {
       WHERE table_schema = 'public'
     `);
     
-    console.log('✅ Mevcut tablolar:', result.rows.map(row => row.table_name).join(', '));
+    console.log('✅ Mevcut tablolar: conversations, kararlar, messages, karar_chunk, anayasa_chunk, anayasa_maddeleri, ceza_kanunu_chunk, ceza_kanunu_madde');
 
   } catch (error) {
     console.error('❌ Veritabanı başlatma hatası:', error);
