@@ -45,6 +45,62 @@ class GeminiService {
     }
   }
 
+  // Anayasa maddelerini arama
+  async searchAnayasaMaddeleri(query, limit = 3) {
+    try {
+      const searchQuery = `
+        SELECT 
+          id,
+          madde_no,
+          baslik,
+          icerik,
+          gerekce
+        FROM anayasa_maddeleri
+        WHERE 
+          icerik ILIKE $1
+          OR baslik ILIKE $1
+          OR gerekce ILIKE $1
+        ORDER BY madde_no
+        LIMIT $2
+      `;
+      
+      const searchTerm = `%${query}%`;
+      const result = await db.query(searchQuery, [searchTerm, limit]);
+      
+      return result.rows;
+    } catch (error) {
+      console.error('Anayasa maddesi arama hatası:', error);
+      return [];
+    }
+  }
+
+  // Ceza kanunu maddelerini arama
+  async searchCezaKanunu(query, limit = 3) {
+    try {
+      const searchQuery = `
+        SELECT 
+          id,
+          madde_no,
+          baslik,
+          icerik
+        FROM ceza_kanunu_madde
+        WHERE 
+          icerik ILIKE $1
+          OR baslik ILIKE $1
+        ORDER BY madde_no
+        LIMIT $2
+      `;
+      
+      const searchTerm = `%${query}%`;
+      const result = await db.query(searchQuery, [searchTerm, limit]);
+      
+      return result.rows;
+    } catch (error) {
+      console.error('Ceza kanunu arama hatası:', error);
+      return [];
+    }
+  }
+
   // Context'i hazırla
   async prepareContext(query) {
     try {
@@ -64,18 +120,46 @@ class GeminiService {
     
     // Fallback olarak text search kullan
     const similarCases = await this.searchSimilarCases(query);
+    const anayasaMaddeleri = await this.searchAnayasaMaddeleri(query);
+    const cezaKanunu = await this.searchCezaKanunu(query);
     
-    let context = "İlgili mahkeme kararları:\n\n";
+    let context = "";
     
-    similarCases.forEach((case_, index) => {
-      context += `${index + 1}. Başlık: ${case_.baslik}\n`;
-      context += `   Mahkeme: ${case_.mahkeme}\n`;
-      context += `   Başvuru No: ${case_.basvuru_no}\n`;
-      context += `   Tarih: ${case_.karar_tarihi}\n`;
-      context += `   Başvurucu: ${case_.basvurucu}\n`;
-      context += `   Özet: ${case_.karar_ozeti}\n`;
-      context += `   Karar Metni: ${case_.tum_metin.substring(0, 800)}...\n\n`;
-    });
+    // Mahkeme kararları
+    if (similarCases.length > 0) {
+      context += "İlgili mahkeme kararları:\n\n";
+      similarCases.forEach((case_, index) => {
+        context += `${index + 1}. Başlık: ${case_.baslik}\n`;
+        context += `   Mahkeme: ${case_.mahkeme}\n`;
+        context += `   Başvuru No: ${case_.basvuru_no}\n`;
+        context += `   Tarih: ${case_.karar_tarihi}\n`;
+        context += `   Başvurucu: ${case_.basvurucu}\n`;
+        context += `   Özet: ${case_.karar_ozeti}\n`;
+        context += `   Karar Metni: ${case_.tum_metin.substring(0, 800)}...\n\n`;
+      });
+    }
+    
+    // Anayasa maddeleri
+    if (anayasaMaddeleri.length > 0) {
+      context += "İlgili anayasa maddeleri:\n\n";
+      anayasaMaddeleri.forEach((madde, index) => {
+        context += `${index + 1}. Madde ${madde.madde_no}: ${madde.baslik}\n`;
+        context += `   İçerik: ${madde.icerik}\n`;
+        if (madde.gerekce) {
+          context += `   Gerekçe: ${madde.gerekce}\n`;
+        }
+        context += '\n';
+      });
+    }
+    
+    // Ceza kanunu maddeleri
+    if (cezaKanunu.length > 0) {
+      context += "İlgili ceza kanunu maddeleri:\n\n";
+      cezaKanunu.forEach((madde, index) => {
+        context += `${index + 1}. Madde ${madde.madde_no}: ${madde.baslik}\n`;
+        context += `   İçerik: ${madde.icerik}\n\n`;
+      });
+    }
     
     return context;
   }
