@@ -229,4 +229,150 @@ router.get('/search', async (req, res) => {
   }
 });
 
+// Otomatik Database Senkronizasyonu
+router.post('/sync', async (req, res) => {
+  console.log('🔄 Database senkronizasyonu başlatılıyor');
+  
+  try {
+    const { sourceData } = req.body;
+    
+    if (!sourceData) {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Kaynak veri gerekli' 
+      });
+    }
+
+    let syncResults = {
+      conversations: { added: 0, updated: 0, errors: 0 },
+      messages: { added: 0, updated: 0, errors: 0 },
+      kararlar: { added: 0, updated: 0, errors: 0 }
+    };
+
+    // Conversations senkronizasyonu
+    if (sourceData.conversations && sourceData.conversations.length > 0) {
+      for (const conv of sourceData.conversations) {
+        try {
+          const existingConv = await pool.query(
+            'SELECT id FROM conversations WHERE id = $1',
+            [conv.id]
+          );
+
+          if (existingConv.rows.length === 0) {
+            // Yeni conversation ekle
+            await pool.query(`
+              INSERT INTO conversations (id, user_id, title, created_at, updated_at, is_active)
+              VALUES ($1, $2, $3, $4, $5, $6)
+            `, [conv.id, conv.user_id, conv.title, conv.created_at, conv.updated_at, conv.is_active]);
+            syncResults.conversations.added++;
+          } else {
+            // Mevcut conversation güncelle
+            await pool.query(`
+              UPDATE conversations 
+              SET title = $2, updated_at = $3, is_active = $4
+              WHERE id = $1
+            `, [conv.id, conv.title, conv.updated_at, conv.is_active]);
+            syncResults.conversations.updated++;
+          }
+        } catch (error) {
+          console.error('Conversation sync error:', error);
+          syncResults.conversations.errors++;
+        }
+      }
+    }
+
+    // Messages senkronizasyonu
+    if (sourceData.messages && sourceData.messages.length > 0) {
+      for (const msg of sourceData.messages) {
+        try {
+          const existingMsg = await pool.query(
+            'SELECT id FROM messages WHERE id = $1',
+            [msg.id]
+          );
+
+          if (existingMsg.rows.length === 0) {
+            // Yeni message ekle
+            await pool.query(`
+              INSERT INTO messages (id, conversation_id, role, content, created_at)
+              VALUES ($1, $2, $3, $4, $5)
+            `, [msg.id, msg.conversation_id, msg.role, msg.content, msg.created_at]);
+            syncResults.messages.added++;
+          }
+        } catch (error) {
+          console.error('Message sync error:', error);
+          syncResults.messages.errors++;
+        }
+      }
+    }
+
+    // Kararlar senkronizasyonu (sadece yeni kayıtlar)
+    if (sourceData.kararlar && sourceData.kararlar.length > 0) {
+      for (const karar of sourceData.kararlar) {
+        try {
+          const existingKarar = await pool.query(
+            'SELECT id FROM kararlar WHERE id = $1',
+            [karar.id]
+          );
+
+          if (existingKarar.rows.length === 0) {
+            // Yeni karar ekle
+            await pool.query(`
+              INSERT INTO kararlar (id, karar_tarihi, basvuru_no, rg_tarih_sayi, mahkeme, 
+                üyeler, raportor, basvurucu, karar_ozeti, degerlendirme, giderim, hüküm, baslik, url)
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+            `, [karar.id, karar.karar_tarihi, karar.basvuru_no, karar.rg_tarih_sayi, karar.mahkeme,
+                karar.üyeler, karar.raportor, karar.basvurucu, karar.karar_ozeti, karar.degerlendirme,
+                karar.giderim, karar.hüküm, karar.baslik, karar.url]);
+            syncResults.kararlar.added++;
+          }
+        } catch (error) {
+          console.error('Karar sync error:', error);
+          syncResults.kararlar.errors++;
+        }
+      }
+    }
+
+    console.log('✅ Senkronizasyon tamamlandı:', syncResults);
+
+    res.json({
+      success: true,
+      message: 'Database senkronizasyonu tamamlandı',
+      results: syncResults
+    });
+
+  } catch (error) {
+    console.error('❌ Senkronizasyon hatası:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Senkronizasyon başarısız' 
+    });
+  }
+});
+
+// Senkronizasyon durumu kontrolü
+router.get('/sync/status', async (req, res) => {
+  try {
+    const stats = await pool.query(`
+      SELECT 
+        (SELECT COUNT(*) FROM conversations) as conversations_count,
+        (SELECT COUNT(*) FROM messages) as messages_count,
+        (SELECT COUNT(*) FROM kararlar) as kararlar_count,
+        (SELECT MAX(created_at) FROM conversations) as last_conversation,
+        (SELECT MAX(created_at) FROM messages) as last_message
+    `);
+
+    res.json({
+      success: true,
+      status: stats.rows[0]
+    });
+
+  } catch (error) {
+    console.error('❌ Sync status error:', error);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Durum alınamadı' 
+    });
+  }
+});
+
 module.exports = router; 
