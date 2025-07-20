@@ -58,6 +58,30 @@ async function syncToUbuntu() {
     console.log(`   - Messages: ${syncData.messages.length}`);
     console.log(`   - Kararlar: ${syncData.kararlar.length}`);
     
+    // Veri detaylarını göster
+    console.log('\n📋 VERİ DETAYLARI:');
+    
+    if (syncData.conversations.length > 0) {
+      console.log('\n💬 Conversations:');
+      syncData.conversations.forEach((conv, index) => {
+        console.log(`   ${index + 1}. ID: ${conv.id}, Title: ${conv.title}, User: ${conv.user_id}`);
+      });
+    }
+    
+    if (syncData.messages.length > 0) {
+      console.log('\n💭 Messages:');
+      syncData.messages.forEach((msg, index) => {
+        console.log(`   ${index + 1}. ID: ${msg.id}, Role: ${msg.role}, Content: ${msg.content.substring(0, 50)}...`);
+      });
+    }
+    
+    if (syncData.kararlar.length > 0) {
+      console.log('\n⚖️ Kararlar:');
+      syncData.kararlar.forEach((karar, index) => {
+        console.log(`   ${index + 1}. ID: ${karar.id}, Başlık: ${karar.baslik}, Mahkeme: ${karar.mahkeme}`);
+      });
+    }
+    
     if (syncData.conversations.length === 0 && 
         syncData.messages.length === 0 && 
         syncData.kararlar.length === 0) {
@@ -65,22 +89,8 @@ async function syncToUbuntu() {
       return;
     }
     
-    // Ubuntu'ya gönder
-    const response = await axios.post(UBUNTU_API_URL, {
-      sourceData: syncData
-    }, {
-      timeout: 30000, // 30 saniye timeout
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-    
-    if (response.data.success) {
-      console.log('✅ Senkronizasyon başarılı!');
-      console.log('📈 Sonuçlar:', response.data.results);
-    } else {
-      console.error('❌ Senkronizasyon başarısız:', response.data.error);
-    }
+    console.log('\n🔄 Ubuntu\'ya gönderme işlemi atlanıyor (nginx hatası)...');
+    console.log('Ubuntu\'da nginx config düzeltildikten sonra tekrar deneyin.');
     
   } catch (error) {
     console.error('❌ Senkronizasyon hatası:', error.message);
