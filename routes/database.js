@@ -248,7 +248,7 @@ router.post('/sync', async (req, res) => {
       messages: { added: 0, updated: 0, errors: 0 },
       kararlar: { added: 0, updated: 0, errors: 0 },
       kararChunk: { added: 0, updated: 0, errors: 0 },
-      yeniTablolar: { added: 0, updated: 0, errors: 0 }
+      tumTablolar: { added: 0, updated: 0, errors: 0 }
     };
 
     // Conversations senkronizasyonu
@@ -358,18 +358,42 @@ router.post('/sync', async (req, res) => {
       }
     }
 
-    // Yeni tabloları kontrol et ve bildir
-    if (sourceData.yeniTablolar && sourceData.yeniTablolar.length > 0) {
-      console.log('🆕 Yeni tablolar tespit edildi:', sourceData.yeniTablolar.map(t => t.table_name));
+    // Tüm tabloları senkronize et
+    if (sourceData.tumTablolar && Object.keys(sourceData.tumTablolar).length > 0) {
+      console.log('🔄 Tüm tablolar senkronize ediliyor...');
       
-      for (const tablo of sourceData.yeniTablolar) {
+      for (const [tabloAdi, veriler] of Object.entries(sourceData.tumTablolar)) {
         try {
-          // Yeni tablo bilgisini logla
-          console.log(`📋 Yeni tablo: ${tablo.table_name}`);
-          syncResults.yeniTablolar.added++;
+          console.log(`📋 ${tabloAdi} tablosu işleniyor (${veriler.length} kayıt)`);
+          
+          // Her tablo için dinamik insert/update
+          for (const veri of veriler) {
+            try {
+              // Tablo yapısını kontrol et
+              const columns = Object.keys(veri);
+              const values = Object.values(veri);
+              const placeholders = columns.map((_, index) => `$${index + 1}`).join(', ');
+              
+              // Upsert sorgusu (INSERT ... ON CONFLICT DO UPDATE)
+              const query = `
+                INSERT INTO "${tabloAdi}" (${columns.join(', ')})
+                VALUES (${placeholders})
+                ON CONFLICT (id) DO UPDATE SET
+                ${columns.filter(col => col !== 'id').map((col, index) => `${col} = EXCLUDED.${col}`).join(', ')}
+              `;
+              
+              await pool.query(query, values);
+              syncResults.tumTablolar.added++;
+              
+            } catch (rowError) {
+              console.error(`${tabloAdi} satır hatası:`, rowError.message);
+              syncResults.tumTablolar.errors++;
+            }
+          }
+          
         } catch (error) {
-          console.error('Yeni tablo sync error:', error);
-          syncResults.yeniTablolar.errors++;
+          console.error(`${tabloAdi} tablo sync error:`, error);
+          syncResults.tumTablolar.errors++;
         }
       }
     }

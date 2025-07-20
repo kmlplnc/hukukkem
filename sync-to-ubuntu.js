@@ -55,21 +55,36 @@ async function syncToUbuntu() {
       LIMIT 20
     `);
     
-    // Yeni tabloları kontrol et (örnek)
-    const yeniTablolarResult = await windowsPool.query(`
+    // Tüm tabloları kontrol et
+    const tumTablolarResult = await windowsPool.query(`
       SELECT table_name 
       FROM information_schema.tables 
       WHERE table_schema = 'public' 
-      AND table_name NOT IN ('conversations', 'messages', 'kararlar', 'karar_chunk')
       ORDER BY table_name
     `);
+    
+    // Her tablodan veri çek
+    const tumTabloVerileri = {};
+    
+    for (const tablo of tumTablolarResult.rows) {
+      try {
+        const tabloAdi = tablo.table_name;
+        const veriResult = await windowsPool.query(`
+          SELECT * FROM "${tabloAdi}" LIMIT 10
+        `);
+        tumTabloVerileri[tabloAdi] = veriResult.rows;
+        console.log(`📋 ${tabloAdi} tablosundan ${veriResult.rows.length} kayıt alındı`);
+      } catch (error) {
+        console.error(`❌ ${tablo.table_name} tablosundan veri alınamadı:`, error.message);
+      }
+    }
     
     const syncData = {
       conversations: conversationsResult.rows,
       messages: messagesResult.rows,
       kararlar: kararlarResult.rows,
       kararChunk: kararChunkResult.rows,
-      yeniTablolar: yeniTablolarResult.rows
+      tumTablolar: tumTabloVerileri
     };
     
     console.log(`📊 Senkronizasyon verileri:`);
@@ -77,7 +92,10 @@ async function syncToUbuntu() {
     console.log(`   - Messages: ${syncData.messages.length}`);
     console.log(`   - Kararlar: ${syncData.kararlar.length}`);
     console.log(`   - Karar Chunk: ${syncData.kararChunk.length}`);
-    console.log(`   - Yeni Tablolar: ${syncData.yeniTablolar.length}`);
+    console.log(`   - Toplam Tablolar: ${Object.keys(syncData.tumTablolar).length}`);
+    
+    // Tablo listesini göster
+    console.log(`📋 Tablolar: ${Object.keys(syncData.tumTablolar).join(', ')}`);
     
     // Veri detaylarını göster
     console.log('\n📋 VERİ DETAYLARI:');
@@ -124,7 +142,7 @@ async function syncToUbuntu() {
     const response = await axios.post(UBUNTU_API_URL, {
       sourceData: syncData
     }, {
-      timeout: 30000, // 30 saniye timeout
+      timeout: 60000, // 60 saniye timeout
       headers: {
         'Content-Type': 'application/json'
       }
