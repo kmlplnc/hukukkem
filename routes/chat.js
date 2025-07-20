@@ -266,6 +266,15 @@ router.get('/conversations', async (req, res) => {
   console.log('👤 Kullanıcı ID:', userId, 'IP:', clientIP, 'Admin:', isAdminUser);
 
   try {
+    // Debug: Database connection test
+    console.log('🔍 Chat route - Database connection test');
+    try {
+      const testResult = await pool.query('SELECT current_database(), current_user');
+      console.log('🔍 Chat route connected to:', testResult.rows[0]);
+    } catch (error) {
+      console.error('❌ Chat route database error:', error);
+    }
+
     const result = await pool.query(
       `SELECT id, title, created_at, updated_at, message_count 
        FROM conversations 

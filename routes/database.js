@@ -137,6 +137,15 @@ router.get('/stats', async (req, res) => {
   console.log('📊 İstatistikler isteniyor');
   
   try {
+    // Debug: Database connection test
+    console.log('🔍 Database route - Database connection test');
+    try {
+      const testResult = await pool.query('SELECT current_database(), current_user');
+      console.log('🔍 Database route connected to:', testResult.rows[0]);
+    } catch (error) {
+      console.error('❌ Database route database error:', error);
+    }
+
     // Mahkeme kararları istatistikleri
     const kararlarResult = await pool.query('SELECT COUNT(*) as total FROM kararlar');
     const chunksResult = await pool.query('SELECT COUNT(*) as total FROM karar_chunk');

@@ -1,89 +1,54 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
+console.log('🔍 Environment Variables Debug:');
+console.log('  DB_HOST:', process.env.DB_HOST);
+console.log('  DB_PORT:', process.env.DB_PORT);
+console.log('  DB_NAME:', process.env.DB_NAME);
+console.log('  DB_USER:', process.env.DB_USER);
+console.log('  DB_PASSWORD:', process.env.DB_PASSWORD ? '***SET***' : 'NOT SET');
+
 const pool = new Pool({
   host: process.env.DB_HOST || 'localhost',
-  port: process.env.DB_PORT || 5432,
+  port: parseInt(process.env.DB_PORT) || 5433,
   database: process.env.DB_NAME || 'hukuk',
-  user: process.env.DB_USER || 'postgres',
-  password: String(process.env.DB_PASSWORD) || 'password',
+  user: process.env.DB_USER || 'hukuk_user',
+  password: process.env.DB_PASSWORD || 'hukuk_pass',
   max: 20,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
 });
 
-// Veritabanı bağlantısını test et ve tabloları oluştur
+console.log('🔧 Pool Configuration:');
+console.log('  Host:', pool.options.host);
+console.log('  Port:', pool.options.port);
+console.log('  Database:', pool.options.database);
+console.log('  User:', pool.options.user);
+
+// Veritabanı bağlantısını test et
 async function initializeDatabase() {
   try {
     console.log('✅ PostgreSQL veritabanına bağlandı');
     
-    // Conversations tablosunu oluştur
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS conversations (
-        id VARCHAR(100) PRIMARY KEY,
-        user_id VARCHAR(50) NOT NULL,
-        title VARCHAR(200),
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
-      )
+    // Hangi veritabanına bağlandığını kontrol et
+    const dbResult = await pool.query('SELECT current_database(), current_user');
+    console.log('🔍 Connected to database:', dbResult.rows[0]);
+    
+    // Mevcut tabloları kontrol et
+    const result = await pool.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public'
     `);
-
-    // Messages tablosunu oluştur
-    await pool.query(`
-      CREATE TABLE IF NOT EXISTS messages (
-        id SERIAL PRIMARY KEY,
-        conversation_id VARCHAR(100) REFERENCES conversations(id) ON DELETE CASCADE,
-        role VARCHAR(20) NOT NULL CHECK (role IN ('user', 'assistant')),
-        content TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT NOW(),
-        message_order INTEGER NOT NULL
-      )
-    `);
-
-    // İndeksler oluştur
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_conversations_user_id ON conversations(user_id)
-    `);
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_conversations_created_at ON conversations(created_at)
-    `);
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id)
-    `);
-    await pool.query(`
-      CREATE INDEX IF NOT EXISTS idx_messages_created_at ON messages(created_at)
-    `);
-
-    // Trigger fonksiyonu oluştur
-    await pool.query(`
-      CREATE OR REPLACE FUNCTION update_conversation_updated_at()
-      RETURNS TRIGGER AS $$
-      BEGIN
-        UPDATE conversations 
-        SET updated_at = NOW()
-        WHERE id = NEW.conversation_id;
-        RETURN NEW;
-      END;
-      $$ LANGUAGE plpgsql;
-    `);
-
-    // Trigger oluştur
-    await pool.query(`
-      DROP TRIGGER IF EXISTS update_conversation_updated_at_trigger ON messages;
-      CREATE TRIGGER update_conversation_updated_at_trigger
-      AFTER INSERT ON messages
-      FOR EACH ROW
-      EXECUTE FUNCTION update_conversation_updated_at();
-    `);
-
-    console.log('✅ Conversations ve messages tabloları oluşturuldu');
+    
+    console.log('✅ Mevcut tablolar:', result.rows.map(row => row.table_name).join(', '));
 
   } catch (error) {
     console.error('❌ Veritabanı başlatma hatası:', error);
   }
 }
 
-// Başlangıçta tabloları oluştur
+// Başlangıçta tabloları kontrol et
 initializeDatabase();
 
 module.exports = pool; 
