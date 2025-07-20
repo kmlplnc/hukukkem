@@ -47,16 +47,27 @@ async function syncToUbuntu() {
       LIMIT 10
     `);
     
+    // Yeni tabloları kontrol et (örnek)
+    const yeniTablolarResult = await windowsPool.query(`
+      SELECT table_name 
+      FROM information_schema.tables 
+      WHERE table_schema = 'public' 
+      AND table_name NOT IN ('conversations', 'messages', 'kararlar', 'karar_chunk')
+      ORDER BY table_name
+    `);
+    
     const syncData = {
       conversations: conversationsResult.rows,
       messages: messagesResult.rows,
-      kararlar: kararlarResult.rows
+      kararlar: kararlarResult.rows,
+      yeniTablolar: yeniTablolarResult.rows
     };
     
     console.log(`📊 Senkronizasyon verileri:`);
     console.log(`   - Conversations: ${syncData.conversations.length}`);
     console.log(`   - Messages: ${syncData.messages.length}`);
     console.log(`   - Kararlar: ${syncData.kararlar.length}`);
+    console.log(`   - Yeni Tablolar: ${syncData.yeniTablolar.length}`);
     
     // Veri detaylarını göster
     console.log('\n📋 VERİ DETAYLARI:');
@@ -84,13 +95,29 @@ async function syncToUbuntu() {
     
     if (syncData.conversations.length === 0 && 
         syncData.messages.length === 0 && 
-        syncData.kararlar.length === 0) {
+        syncData.kararlar.length === 0 &&
+        syncData.yeniTablolar.length === 0) {
       console.log('✅ Yeni veri yok, senkronizasyon gerekli değil');
       return;
     }
     
-    console.log('\n🔄 Ubuntu\'ya gönderme işlemi atlanıyor (nginx hatası)...');
-    console.log('Ubuntu\'da nginx config düzeltildikten sonra tekrar deneyin.');
+    // Ubuntu'ya gönder
+    console.log('\n🔄 Ubuntu\'ya gönderiliyor...');
+    const response = await axios.post(UBUNTU_API_URL, {
+      sourceData: syncData
+    }, {
+      timeout: 30000, // 30 saniye timeout
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (response.data.success) {
+      console.log('✅ Senkronizasyon başarılı!');
+      console.log('📈 Sonuçlar:', response.data.results);
+    } else {
+      console.error('❌ Senkronizasyon başarısız:', response.data.error);
+    }
     
   } catch (error) {
     console.error('❌ Senkronizasyon hatası:', error.message);
