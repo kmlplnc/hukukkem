@@ -246,7 +246,9 @@ router.post('/sync', async (req, res) => {
     let syncResults = {
       conversations: { added: 0, updated: 0, errors: 0 },
       messages: { added: 0, updated: 0, errors: 0 },
-      kararlar: { added: 0, updated: 0, errors: 0 }
+      kararlar: { added: 0, updated: 0, errors: 0 },
+      kararChunk: { added: 0, updated: 0, errors: 0 },
+      yeniTablolar: { added: 0, updated: 0, errors: 0 }
     };
 
     // Conversations senkronizasyonu
@@ -332,6 +334,46 @@ router.post('/sync', async (req, res) => {
       }
     }
 
+    // Karar chunk'ları senkronizasyonu
+    if (sourceData.kararChunk && sourceData.kararChunk.length > 0) {
+      for (const chunk of sourceData.kararChunk) {
+        try {
+          const existingChunk = await pool.query(
+            'SELECT karar_id, chunk_index FROM karar_chunk WHERE karar_id = $1 AND chunk_index = $2',
+            [chunk.karar_id, chunk.chunk_index]
+          );
+
+          if (existingChunk.rows.length === 0) {
+            // Yeni chunk ekle
+            await pool.query(`
+              INSERT INTO karar_chunk (karar_id, chunk_index, section, chunk_text)
+              VALUES ($1, $2, $3, $4)
+            `, [chunk.karar_id, chunk.chunk_index, chunk.section, chunk.chunk_text]);
+            syncResults.kararChunk.added++;
+          }
+        } catch (error) {
+          console.error('Karar chunk sync error:', error);
+          syncResults.kararChunk.errors++;
+        }
+      }
+    }
+
+    // Yeni tabloları kontrol et ve bildir
+    if (sourceData.yeniTablolar && sourceData.yeniTablolar.length > 0) {
+      console.log('🆕 Yeni tablolar tespit edildi:', sourceData.yeniTablolar.map(t => t.table_name));
+      
+      for (const tablo of sourceData.yeniTablolar) {
+        try {
+          // Yeni tablo bilgisini logla
+          console.log(`📋 Yeni tablo: ${tablo.table_name}`);
+          syncResults.yeniTablolar.added++;
+        } catch (error) {
+          console.error('Yeni tablo sync error:', error);
+          syncResults.yeniTablolar.errors++;
+        }
+      }
+    }
+
     console.log('✅ Senkronizasyon tamamlandı:', syncResults);
 
     res.json({
@@ -357,6 +399,7 @@ router.get('/sync/status', async (req, res) => {
         (SELECT COUNT(*) FROM conversations) as conversations_count,
         (SELECT COUNT(*) FROM messages) as messages_count,
         (SELECT COUNT(*) FROM kararlar) as kararlar_count,
+        (SELECT COUNT(*) FROM karar_chunk) as karar_chunk_count,
         (SELECT MAX(created_at) FROM conversations) as last_conversation,
         (SELECT MAX(created_at) FROM messages) as last_message
     `);
