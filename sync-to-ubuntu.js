@@ -47,6 +47,14 @@ async function syncToUbuntu() {
       LIMIT 10
     `);
     
+    // Karar chunk'ları (son 20 kayıt)
+    const kararChunkResult = await windowsPool.query(`
+      SELECT karar_id, chunk_index, section, chunk_text
+      FROM karar_chunk 
+      ORDER BY karar_id DESC, chunk_index DESC
+      LIMIT 20
+    `);
+    
     // Yeni tabloları kontrol et (örnek)
     const yeniTablolarResult = await windowsPool.query(`
       SELECT table_name 
@@ -60,6 +68,7 @@ async function syncToUbuntu() {
       conversations: conversationsResult.rows,
       messages: messagesResult.rows,
       kararlar: kararlarResult.rows,
+      kararChunk: kararChunkResult.rows,
       yeniTablolar: yeniTablolarResult.rows
     };
     
@@ -67,6 +76,7 @@ async function syncToUbuntu() {
     console.log(`   - Conversations: ${syncData.conversations.length}`);
     console.log(`   - Messages: ${syncData.messages.length}`);
     console.log(`   - Kararlar: ${syncData.kararlar.length}`);
+    console.log(`   - Karar Chunk: ${syncData.kararChunk.length}`);
     console.log(`   - Yeni Tablolar: ${syncData.yeniTablolar.length}`);
     
     // Veri detaylarını göster
@@ -93,9 +103,17 @@ async function syncToUbuntu() {
       });
     }
     
+    if (syncData.kararChunk.length > 0) {
+      console.log('\n📄 Karar Chunk:');
+      syncData.kararChunk.forEach((chunk, index) => {
+        console.log(`   ${index + 1}. Karar ID: ${chunk.karar_id}, Chunk: ${chunk.chunk_index}, Section: ${chunk.section}`);
+      });
+    }
+    
     if (syncData.conversations.length === 0 && 
         syncData.messages.length === 0 && 
         syncData.kararlar.length === 0 &&
+        syncData.kararChunk.length === 0 &&
         syncData.yeniTablolar.length === 0) {
       console.log('✅ Yeni veri yok, senkronizasyon gerekli değil');
       return;
