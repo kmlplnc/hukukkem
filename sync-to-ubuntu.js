@@ -1,13 +1,13 @@
 const { Pool } = require('pg');
 const axios = require('axios');
 
-// Windows PostgreSQL bağlantısı
+// Windows Docker PostgreSQL bağlantısı
 const windowsPool = new Pool({
   host: 'localhost',
   port: 5432,
   database: 'hukuk',
-  user: 'postgres',
-  password: 'your-windows-password'
+  user: 'hukuk_user',
+  password: 'hukuk_pass'
 });
 
 // Ubuntu server URL
